@@ -1,12 +1,13 @@
-import sys
 import math
+import sys
+
 import numpy as np
 import torch
-
 
 # load FAISS GPU library if available (dramatically accelerates the nearest neighbor search)
 try:
     import faiss
+
     FAISS_AVAILABLE = hasattr(faiss, 'StandardGpuResources')
 except ImportError:
     FAISS_AVAILABLE = False
@@ -101,22 +102,22 @@ def get_knn_pytorch(a, b, k, distance='dot_product'):
     with torch.no_grad():
 
         if distance == 'dot_product':
-            scores = a.mm(b.t())                                 # (m, n)
+            scores = a.mm(b.t())  # (m, n)
 
         elif distance == 'cosine':
-            scores = a.mm(b.t())                                 # (m, n)
-            scores /= (a.norm(2, 1)[:, None] + 1e-9)             # (m, n)
-            scores /= (b.norm(2, 1)[None, :] + 1e-9)             # (m, n)
+            scores = a.mm(b.t())  # (m, n)
+            scores /= (a.norm(2, 1)[:, None] + 1e-9)  # (m, n)
+            scores /= (b.norm(2, 1)[None, :] + 1e-9)  # (m, n)
 
         elif distance == 'l2':
-            scores = a.mm(b.t())                                 # (m, n)
-            scores *= 2                                          # (m, n)
-            scores -= (a ** 2).sum(1)[:, None]                   # (m, n)
-            scores -= (b ** 2).sum(1)[None, :]                   # (m, n)
+            scores = a.mm(b.t())  # (m, n)
+            scores *= 2  # (m, n)
+            scores -= (a ** 2).sum(1)[:, None]  # (m, n)
+            scores -= (b ** 2).sum(1)[None, :]  # (m, n)
 
         scores, indices = scores.topk(k=k, dim=0, largest=True)  # (k, n)
-        scores = scores.t()                                      # (n, k)
-        indices = indices.t()                                    # (n, k)
+        scores = scores.t()  # (n, k)
+        indices = indices.t()  # (n, k)
 
     return scores, indices
 

@@ -15,16 +15,16 @@
 #     --model_path trained_model.pth --output_path output
 #
 
-import os
-import io
-import sys
 import argparse
+import io
+import os
+import sys
+
 import torch
 
-from xlm.utils import AttrDict
-from xlm.utils import bool_flag, initialize_exp
 from xlm.data.dictionary import Dictionary
 from xlm.model.transformer import TransformerModel
+from xlm.utils import AttrDict, initialize_exp
 
 
 def get_parser():
@@ -55,7 +55,6 @@ def get_parser():
 
 
 def main(params):
-
     # initialize the experiment
     logger = initialize_exp(params)
 
@@ -105,11 +104,11 @@ def main(params):
         # encode source batch and translate it
         encoded = encoder('fwd', x=batch.cuda(), lengths=lengths.cuda(), langs=langs.cuda(), causal=False)
         encoded = encoded.transpose(0, 1)
-        decoded, dec_lengths = decoder.generate(encoded, lengths.cuda(), params.tgt_id, max_len=int(1.5 * lengths.max().item() + 10))
+        decoded, dec_lengths = decoder.generate(encoded, lengths.cuda(), params.tgt_id,
+                                                max_len=int(1.5 * lengths.max().item() + 10))
 
         # convert sentences to words
         for j in range(decoded.size(1)):
-
             # remove delimiters
             sent = decoded[:, j]
             delimiters = (sent == params.eos_index).nonzero().view(-1)
@@ -126,7 +125,6 @@ def main(params):
 
 
 if __name__ == '__main__':
-
     # generate parser / parse parameters
     parser = get_parser()
     params = parser.parse_args()

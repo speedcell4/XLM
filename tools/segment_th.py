@@ -6,6 +6,7 @@
 #
 
 import sys
+
 from pythainlp.tokenize import word_tokenize
 
 for line in sys.stdin.readlines():

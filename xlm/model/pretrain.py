@@ -5,11 +5,11 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-from logging import getLogger
 import io
+from logging import getLogger
+
 import numpy as np
 import torch
-
 
 logger = getLogger()
 

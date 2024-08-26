@@ -5,20 +5,19 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-from logging import getLogger
 import os
 import subprocess
 from collections import OrderedDict
+from logging import getLogger
+
 import numpy as np
 import torch
 
-from ..utils import to_cuda, restore_segmentation, concat_batches
 from ..model.memory import HashingMemory
-
+from ..utils import concat_batches, restore_segmentation, to_cuda
 
 BLEU_SCRIPT_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'multi-bleu.perl')
 assert os.path.isfile(BLEU_SCRIPT_PATH)
-
 
 logger = getLogger()
 
@@ -62,23 +61,23 @@ def eval_memory_usage(scores, name, mem_att, mem_size):
     mem_scores_u = mem_scores_u / mem_scores_u.sum()
 
     # store stats
-    scores['%s_mem_used' % name] = float(100 * (mem_scores_w != 0).sum() / len(mem_scores_w))
+    scores[f'{name}_mem_used'] = float(100 * (mem_scores_w != 0).sum() / len(mem_scores_w))
 
-    scores['%s_mem_kl_w' % name] = float(kl_score(mem_scores_w))
-    scores['%s_mem_kl_u' % name] = float(kl_score(mem_scores_u))
+    scores[f'{name}_mem_kl_w'] = float(kl_score(mem_scores_w))
+    scores[f'{name}_mem_kl_u'] = float(kl_score(mem_scores_u))
 
-    scores['%s_mem_gini_w' % name] = float(gini_score(mem_scores_w))
-    scores['%s_mem_gini_u' % name] = float(gini_score(mem_scores_u))
+    scores[f'{name}_mem_gini_w'] = float(gini_score(mem_scores_w))
+    scores[f'{name}_mem_gini_u'] = float(gini_score(mem_scores_u))
 
     top50, top90, top99 = tops(mem_scores_w)
-    scores['%s_mem_top50_w' % name] = float(top50)
-    scores['%s_mem_top90_w' % name] = float(top90)
-    scores['%s_mem_top99_w' % name] = float(top99)
+    scores[f'{name}_mem_top50_w'] = float(top50)
+    scores[f'{name}_mem_top90_w'] = float(top90)
+    scores[f'{name}_mem_top99_w'] = float(top99)
 
     top50, top90, top99 = tops(mem_scores_u)
-    scores['%s_mem_top50_u' % name] = float(top50)
-    scores['%s_mem_top90_u' % name] = float(top90)
-    scores['%s_mem_top99_u' % name] = float(top99)
+    scores[f'{name}_mem_top50_u'] = float(top50)
+    scores[f'{name}_mem_top90_u'] = float(top90)
+    scores[f'{name}_mem_top99_u'] = float(top99)
 
 
 class Evaluator(object):
@@ -96,7 +95,7 @@ class Evaluator(object):
         # create directory to store hypotheses, and reference files for BLEU evaluation
         if self.params.is_master:
             params.hyp_path = os.path.join(params.dump_path, 'hypotheses')
-            subprocess.Popen('mkdir -p %s' % params.hyp_path, shell=True).wait()
+            subprocess.Popen(f'mkdir -p {params.hyp_path}', shell=True).wait()
             self.create_reference_files()
 
     def get_iterator(self, data_set, lang1, lang2=None, stream=False):
@@ -110,8 +109,16 @@ class Evaluator(object):
 
         # hacks to reduce evaluation time when using many languages
         if len(self.params.langs) > 30:
-            eval_lgs = set(["ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh", "ab", "ay", "bug", "ha", "ko", "ln", "min", "nds", "pap", "pt", "tg", "to", "udm", "uk", "zh_classical"])
-            eval_lgs = set(["ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"])
+            eval_lgs = {
+                "ar", "bg", "de", "el", "en", "es", "fr", "hi",
+                "ru", "sw", "th", "tr", "ur", "vi", "zh", "ab",
+                "ay", "bug", "ha", "ko", "ln", "min", "nds",
+                "pap", "pt", "tg", "to", "udm", "uk", "zh_classical",
+            }
+            eval_lgs = {
+                "ar", "bg", "de", "el", "en", "es", "fr", "hi",
+                "ru", "sw", "th", "tr", "ur", "vi", "zh",
+            }
             subsample = 10 if (data_set == 'test' or lang1 not in eval_lgs) else 5
             n_sentences = 600 if (data_set == 'test' or lang1 not in eval_lgs) else 1500
         elif len(self.params.langs) > 5:
@@ -157,8 +164,8 @@ class Evaluator(object):
             for data_set in ['valid', 'test']:
 
                 # define data paths
-                lang1_path = os.path.join(params.hyp_path, 'ref.{0}-{1}.{2}.txt'.format(lang2, lang1, data_set))
-                lang2_path = os.path.join(params.hyp_path, 'ref.{0}-{1}.{2}.txt'.format(lang1, lang2, data_set))
+                lang1_path = os.path.join(params.hyp_path, f'ref.{lang2}-{lang1}.{data_set}.txt')
+                lang2_path = os.path.join(params.hyp_path, f'ref.{lang1}-{lang2}.{data_set}.txt')
 
                 # store data paths
                 params.ref_paths[(lang2, lang1, data_set)] = lang1_path
@@ -243,12 +250,16 @@ class Evaluator(object):
                 # report average metrics per language
                 _clm_mono = [l1 for (l1, l2) in params.clm_steps if l2 is None]
                 if len(_clm_mono) > 0:
-                    scores['%s_clm_ppl' % data_set] = np.mean([scores['%s_%s_clm_ppl' % (data_set, lang)] for lang in _clm_mono])
-                    scores['%s_clm_acc' % data_set] = np.mean([scores['%s_%s_clm_acc' % (data_set, lang)] for lang in _clm_mono])
+                    scores[f'{data_set}_clm_ppl'] = np.mean(
+                        [scores[f'{data_set}_{lang}_clm_ppl'] for lang in _clm_mono])
+                    scores[f'{data_set}_clm_acc'] = np.mean(
+                        [scores[f'{data_set}_{lang}_clm_acc'] for lang in _clm_mono])
                 _mlm_mono = [l1 for (l1, l2) in params.mlm_steps if l2 is None]
                 if len(_mlm_mono) > 0:
-                    scores['%s_mlm_ppl' % data_set] = np.mean([scores['%s_%s_mlm_ppl' % (data_set, lang)] for lang in _mlm_mono])
-                    scores['%s_mlm_acc' % data_set] = np.mean([scores['%s_%s_mlm_acc' % (data_set, lang)] for lang in _mlm_mono])
+                    scores[f'{data_set}_mlm_ppl'] = np.mean(
+                        [scores[f'{data_set}_{lang}_mlm_ppl'] for lang in _mlm_mono])
+                    scores[f'{data_set}_mlm_acc'] = np.mean(
+                        [scores[f'{data_set}_{lang}_mlm_acc'] for lang in _mlm_mono])
 
         return scores
 
@@ -288,7 +299,8 @@ class Evaluator(object):
                 langs = x.clone().fill_(lang1_id) if params.n_langs > 1 else None
             else:
                 (sent1, len1), (sent2, len2) = batch
-                x, lengths, positions, langs = concat_batches(sent1, len1, lang1_id, sent2, len2, lang2_id, params.pad_index, params.eos_index, reset_positions=True)
+                x, lengths, positions, langs = concat_batches(sent1, len1, lang1_id, sent2, len2, lang2_id,
+                                                              params.pad_index, params.eos_index, reset_positions=True)
 
             # words to predict
             alen = torch.arange(lengths.max(), dtype=torch.long, device=lengths.device)
@@ -312,18 +324,18 @@ class Evaluator(object):
                     all_mem_att[k].append((v.last_indices, v.last_scores))
 
         # log
-        logger.info("Found %i words in %s. %i were predicted correctly." % (n_words, data_set, n_valid))
+        logger.info(f"Found {n_words:d} words in {data_set}. {n_valid:d} were predicted correctly.")
 
         # compute perplexity and prediction accuracy
-        ppl_name = '%s_%s_clm_ppl' % (data_set, l1l2)
-        acc_name = '%s_%s_clm_acc' % (data_set, l1l2)
+        ppl_name = f'{data_set}_{l1l2}_clm_ppl'
+        acc_name = f'{data_set}_{l1l2}_clm_acc'
         scores[ppl_name] = np.exp(xe_loss / n_words)
         scores[acc_name] = 100. * n_valid / n_words
 
         # compute memory usage
         if eval_memory:
             for mem_name, mem_att in all_mem_att.items():
-                eval_memory_usage(scores, '%s_%s_%s' % (data_set, l1l2, mem_name), mem_att, params.mem_size)
+                eval_memory_usage(scores, f'{data_set}_{l1l2}_{mem_name}', mem_att, params.mem_size)
 
     def evaluate_mlm(self, scores, data_set, lang1, lang2):
         """
@@ -363,7 +375,8 @@ class Evaluator(object):
                 langs = x.clone().fill_(lang1_id) if params.n_langs > 1 else None
             else:
                 (sent1, len1), (sent2, len2) = batch
-                x, lengths, positions, langs = concat_batches(sent1, len1, lang1_id, sent2, len2, lang2_id, params.pad_index, params.eos_index, reset_positions=True)
+                x, lengths, positions, langs = concat_batches(sent1, len1, lang1_id, sent2, len2, lang2_id,
+                                                              params.pad_index, params.eos_index, reset_positions=True)
 
             # words to predict
             x, y, pred_mask = self.mask_out(x, lengths, rng)
@@ -384,15 +397,15 @@ class Evaluator(object):
                     all_mem_att[k].append((v.last_indices, v.last_scores))
 
         # compute perplexity and prediction accuracy
-        ppl_name = '%s_%s_mlm_ppl' % (data_set, l1l2)
-        acc_name = '%s_%s_mlm_acc' % (data_set, l1l2)
+        ppl_name = f'{data_set}_{l1l2}_mlm_ppl'
+        acc_name = f'{data_set}_{l1l2}_mlm_acc'
         scores[ppl_name] = np.exp(xe_loss / n_words) if n_words > 0 else 1e9
         scores[acc_name] = 100. * n_valid / n_words if n_words > 0 else 0.
 
         # compute memory usage
         if eval_memory:
             for mem_name, mem_att in all_mem_att.items():
-                eval_memory_usage(scores, '%s_%s_%s' % (data_set, l1l2, mem_name), mem_att, params.mem_size)
+                eval_memory_usage(scores, f'{data_set}_{l1l2}_{mem_name}', mem_att, params.mem_size)
 
 
 class SingleEvaluator(Evaluator):
@@ -497,19 +510,18 @@ class EncDecEvaluator(Evaluator):
                 hypothesis.extend(convert_to_text(generated, lengths, self.dico, params))
 
         # compute perplexity and prediction accuracy
-        scores['%s_%s-%s_mt_ppl' % (data_set, lang1, lang2)] = np.exp(xe_loss / n_words)
-        scores['%s_%s-%s_mt_acc' % (data_set, lang1, lang2)] = 100. * n_valid / n_words
+        scores[f'{data_set}_{lang1}-{lang2}_mt_ppl'] = np.exp(xe_loss / n_words)
+        scores[f'{data_set}_{lang1}-{lang2}_mt_acc'] = 100. * n_valid / n_words
 
         # compute memory usage
         if eval_memory:
             for mem_name, mem_att in all_mem_att.items():
-                eval_memory_usage(scores, '%s_%s-%s_%s' % (data_set, lang1, lang2, mem_name), mem_att, params.mem_size)
+                eval_memory_usage(scores, f'{data_set}_{lang1}-{lang2}_{mem_name}', mem_att, params.mem_size)
 
         # compute BLEU
         if eval_bleu:
-
             # hypothesis / reference paths
-            hyp_name = 'hyp{0}.{1}-{2}.{3}.txt'.format(scores['epoch'], lang1, lang2, data_set)
+            hyp_name = f'hyp{scores["epoch"]}.{lang1}-{lang2}.{data_set}.txt'
             hyp_path = os.path.join(params.hyp_path, hyp_name)
             ref_path = params.ref_paths[(lang1, lang2, data_set)]
 
@@ -520,8 +532,8 @@ class EncDecEvaluator(Evaluator):
 
             # evaluate BLEU score
             bleu = eval_moses_bleu(ref_path, hyp_path)
-            logger.info("BLEU %s %s : %f" % (hyp_path, ref_path, bleu))
-            scores['%s_%s-%s_mt_bleu' % (data_set, lang1, lang2)] = bleu
+            logger.info(f"BLEU {hyp_path} {ref_path} : {bleu:f}")
+            scores[f'{data_set}_{lang1}-{lang2}_mt_bleu'] = bleu
 
 
 def convert_to_text(batch, lengths, dico, params):
@@ -561,5 +573,5 @@ def eval_moses_bleu(ref, hyp):
     if result.startswith('BLEU'):
         return float(result[7:result.index(',')])
     else:
-        logger.warning('Impossible to parse BLEU score! "%s"' % result)
+        logger.warning(f'Impossible to parse BLEU score! "{result}"')
         return -1

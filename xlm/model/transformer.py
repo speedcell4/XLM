@@ -5,16 +5,16 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-from logging import getLogger
-import math
 import itertools
+import math
+from logging import getLogger
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from .memory import HashingMemory
-
 
 N_MAX_POSITIONS = 512  # maximum input sequence length
 
@@ -36,7 +36,6 @@ TRANSFORMER_LAYER_PARAMS = [
     'ffns.%i.lin2.weight', 'ffns.%i.lin2.bias',
     'layer_norm2.%i.weight', 'layer_norm2.%i.bias'
 ]
-
 
 logger = getLogger()
 
@@ -105,6 +104,7 @@ class PredLayer(nn.Module):
     """
     Prediction layer (cross_entropy or adaptive_softmax).
     """
+
     def __init__(self, params):
         super().__init__()
         self.asm = params.asm
@@ -147,7 +147,6 @@ class PredLayer(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-
     NEW_ID = itertools.count()
 
     def __init__(self, n_heads, dim, dropout):
@@ -187,34 +186,34 @@ class MultiHeadAttention(nn.Module):
             """  compute context """
             return x.transpose(1, 2).contiguous().view(bs, -1, self.n_heads * dim_per_head)
 
-        q = shape(self.q_lin(input))                                          # (bs, n_heads, qlen, dim_per_head)
+        q = shape(self.q_lin(input))  # (bs, n_heads, qlen, dim_per_head)
         if kv is None:
-            k = shape(self.k_lin(input))                                      # (bs, n_heads, qlen, dim_per_head)
-            v = shape(self.v_lin(input))                                      # (bs, n_heads, qlen, dim_per_head)
+            k = shape(self.k_lin(input))  # (bs, n_heads, qlen, dim_per_head)
+            v = shape(self.v_lin(input))  # (bs, n_heads, qlen, dim_per_head)
         elif cache is None or self.layer_id not in cache:
             k = v = kv
-            k = shape(self.k_lin(k))                                          # (bs, n_heads, qlen, dim_per_head)
-            v = shape(self.v_lin(v))                                          # (bs, n_heads, qlen, dim_per_head)
+            k = shape(self.k_lin(k))  # (bs, n_heads, qlen, dim_per_head)
+            v = shape(self.v_lin(v))  # (bs, n_heads, qlen, dim_per_head)
 
         if cache is not None:
             if self.layer_id in cache:
                 if kv is None:
                     k_, v_ = cache[self.layer_id]
-                    k = torch.cat([k_, k], dim=2)                             # (bs, n_heads, klen, dim_per_head)
-                    v = torch.cat([v_, v], dim=2)                             # (bs, n_heads, klen, dim_per_head)
+                    k = torch.cat([k_, k], dim=2)  # (bs, n_heads, klen, dim_per_head)
+                    v = torch.cat([v_, v], dim=2)  # (bs, n_heads, klen, dim_per_head)
                 else:
                     k, v = cache[self.layer_id]
             cache[self.layer_id] = (k, v)
 
-        q = q / math.sqrt(dim_per_head)                                       # (bs, n_heads, qlen, dim_per_head)
-        scores = torch.matmul(q, k.transpose(2, 3))                           # (bs, n_heads, qlen, klen)
-        mask = (mask == 0).view(mask_reshape).expand_as(scores)               # (bs, n_heads, qlen, klen)
-        scores.masked_fill_(mask, -float('inf'))                              # (bs, n_heads, qlen, klen)
+        q = q / math.sqrt(dim_per_head)  # (bs, n_heads, qlen, dim_per_head)
+        scores = torch.matmul(q, k.transpose(2, 3))  # (bs, n_heads, qlen, klen)
+        mask = (mask == 0).view(mask_reshape).expand_as(scores)  # (bs, n_heads, qlen, klen)
+        scores.masked_fill_(mask, -float('inf'))  # (bs, n_heads, qlen, klen)
 
-        weights = F.softmax(scores.float(), dim=-1).type_as(scores)           # (bs, n_heads, qlen, klen)
+        weights = F.softmax(scores.float(), dim=-1).type_as(scores)  # (bs, n_heads, qlen, klen)
         weights = F.dropout(weights, p=self.dropout, training=self.training)  # (bs, n_heads, qlen, klen)
-        context = torch.matmul(weights, v)                                    # (bs, n_heads, qlen, dim_per_head)
-        context = unshape(context)                                            # (bs, qlen, dim)
+        context = torch.matmul(weights, v)  # (bs, n_heads, qlen, dim_per_head)
+        context = unshape(context)  # (bs, qlen, dim)
 
         return self.out_lin(context)
 
@@ -237,8 +236,8 @@ class TransformerFFN(nn.Module):
 
 
 class TransformerModel(nn.Module):
-
-    ATTRIBUTES = ['encoder', 'with_output', 'eos_index', 'pad_index', 'n_langs', 'n_words', 'dim', 'n_layers', 'n_heads', 'hidden_dim', 'dropout', 'attention_dropout', 'asm', 'asm_cutoffs', 'asm_div_value']
+    ATTRIBUTES = ['encoder', 'with_output', 'eos_index', 'pad_index', 'n_langs', 'n_words', 'dim', 'n_layers',
+                  'n_heads', 'hidden_dim', 'dropout', 'attention_dropout', 'asm', 'asm_cutoffs', 'asm_div_value']
 
     def __init__(self, params, dico, is_encoder, with_output):
         """
@@ -264,9 +263,9 @@ class TransformerModel(nn.Module):
         assert len(self.id2lang) == len(self.lang2id) == self.n_langs
 
         # model parameters
-        self.dim = params.emb_dim       # 512 by default
+        self.dim = params.emb_dim  # 512 by default
         self.hidden_dim = self.dim * 4  # 2048 by default
-        self.n_heads = params.n_heads   # 8 by default
+        self.n_heads = params.n_heads  # 8 by default
         self.n_layers = params.n_layers
         self.dropout = params.dropout
         self.attention_dropout = params.attention_dropout
@@ -308,7 +307,8 @@ class TransformerModel(nn.Module):
             if ('%i_in' % layer_id) in self.memories:
                 self.ffns.append(None)
             else:
-                self.ffns.append(TransformerFFN(self.dim, self.hidden_dim, self.dim, dropout=self.dropout, gelu_activation=params.gelu_activation))
+                self.ffns.append(TransformerFFN(self.dim, self.hidden_dim, self.dim, dropout=self.dropout,
+                                                gelu_activation=params.gelu_activation))
             self.layer_norm2.append(nn.LayerNorm(self.dim, eps=1e-12))
 
         # output layer
@@ -463,8 +463,8 @@ class TransformerModel(nn.Module):
 
         # generated sentences
         generated = src_len.new(max_len, bs)  # upcoming output
-        generated.fill_(self.pad_index)       # fill upcoming ouput with <PAD>
-        generated[0].fill_(self.eos_index)    # we use <EOS> for <BOS> everywhere
+        generated.fill_(self.pad_index)  # fill upcoming ouput with <PAD>
+        generated[0].fill_(self.eos_index)  # we use <EOS> for <BOS> everywhere
 
         # positions
         positions = src_len.new(max_len).long()
@@ -496,9 +496,10 @@ class TransformerModel(nn.Module):
                 src_len=src_len,
                 cache=cache
             )
-            assert tensor.size() == (1, bs, self.dim), (cur_len, max_len, src_enc.size(), tensor.size(), (1, bs, self.dim))
+            assert tensor.size() == (1, bs, self.dim), (
+            cur_len, max_len, src_enc.size(), tensor.size(), (1, bs, self.dim))
             tensor = tensor.data[-1, :, :].type_as(src_enc)  # (bs, dim)
-            scores = self.pred_layer.get_scores(tensor)      # (bs, n_words)
+            scores = self.pred_layer.get_scores(tensor)  # (bs, n_words)
 
             # select next words: sample or greedy
             if sample_temperature is None:
@@ -553,13 +554,14 @@ class TransformerModel(nn.Module):
         n_words = self.n_words
 
         # expand to beam size the source latent representations / source lengths
-        src_enc = src_enc.unsqueeze(1).expand((bs, beam_size) + src_enc.shape[1:]).contiguous().view((bs * beam_size,) + src_enc.shape[1:])
+        src_enc = src_enc.unsqueeze(1).expand((bs, beam_size) + src_enc.shape[1:]).contiguous().view(
+            (bs * beam_size,) + src_enc.shape[1:])
         src_len = src_len.unsqueeze(1).expand(bs, beam_size).contiguous().view(-1)
 
         # generated sentences (batch with beam current hypotheses)
         generated = src_len.new(max_len, bs * beam_size)  # upcoming output
-        generated.fill_(self.pad_index)                   # fill upcoming ouput with <PAD>
-        generated[0].fill_(self.eos_index)                # we use <EOS> for <BOS> everywhere
+        generated.fill_(self.pad_index)  # fill upcoming ouput with <PAD>
+        generated[0].fill_(self.eos_index)  # we use <EOS> for <BOS> everywhere
 
         # generated hypotheses
         generated_hyps = [BeamHypotheses(beam_size, max_len, length_penalty, early_stopping) for _ in range(bs)]
@@ -600,14 +602,14 @@ class TransformerModel(nn.Module):
                 cache=cache
             )
             assert tensor.size() == (1, bs * beam_size, self.dim)
-            tensor = tensor.data[-1, :, :]               # (bs * beam_size, dim)
+            tensor = tensor.data[-1, :, :]  # (bs * beam_size, dim)
             scores = self.pred_layer.get_scores(tensor)  # (bs * beam_size, n_words)
-            scores = F.log_softmax(scores, dim=-1)       # (bs * beam_size, n_words)
+            scores = F.log_softmax(scores, dim=-1)  # (bs * beam_size, n_words)
             assert scores.size() == (bs * beam_size, n_words)
 
             # select next words with scores
             _scores = scores + beam_scores[:, None].expand_as(scores)  # (bs * beam_size, n_words)
-            _scores = _scores.view(bs, beam_size * n_words)            # (bs, beam_size * n_words)
+            _scores = _scores.view(bs, beam_size * n_words)  # (bs, beam_size * n_words)
 
             next_scores, next_words = torch.topk(_scores, 2 * beam_size, dim=1, largest=True, sorted=True)
             assert next_scores.size() == next_words.size() == (bs, 2 * beam_size)
@@ -637,7 +639,8 @@ class TransformerModel(nn.Module):
 
                     # end of sentence, or next word
                     if word_id == self.eos_index or cur_len + 1 == max_len:
-                        generated_hyps[sent_id].add(generated[:cur_len, sent_id * beam_size + beam_id].clone(), value.item())
+                        generated_hyps[sent_id].add(generated[:cur_len, sent_id * beam_size + beam_id].clone(),
+                                                    value.item())
                     else:
                         next_sent_beam.append((value, word_id, sent_id * beam_size + beam_id))
 

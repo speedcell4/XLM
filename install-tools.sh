@@ -7,7 +7,7 @@
 
 set -e
 
-lg=$1  # input language
+lg=$1 # input language
 
 # data path
 MAIN_PATH=$PWD
@@ -56,8 +56,8 @@ fi
 
 # Download WikiExtractor
 if [ ! -d $TOOLS_PATH/wikiextractor ]; then
-    echo "Cloning WikiExtractor from GitHub repository..."
-    git clone https://github.com/attardi/wikiextractor.git
+  echo "Cloning WikiExtractor from GitHub repository..."
+  git clone https://github.com/attardi/wikiextractor.git
 fi
 
 # # Chinese segmenter
@@ -66,11 +66,11 @@ fi
 #   echo "Please install Stanford segmenter in $TOOLS_PATH"
 #   exit 1
 # fi
-# 
+#
 # # Thai tokenizer
 # if ! python -c 'import pkgutil; exit(not pkgutil.find_loader("pythainlp"))'; then
 #   echo "pythainlp package not found in python"
 #   echo "Please install pythainlp (pip install pythainlp)"
 #   exit 1
 # fi
-# 
+#

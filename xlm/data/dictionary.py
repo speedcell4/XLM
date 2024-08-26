@@ -6,13 +6,12 @@
 #
 
 import os
-import numpy as np
-import torch
 from logging import getLogger
 
+import numpy as np
+import torch
 
 logger = getLogger()
-
 
 BOS_WORD = '<s>'
 EOS_WORD = '</s>'
@@ -114,7 +113,8 @@ class Dictionary(object):
         """
         assert min_count >= 0
         init_size = len(self)
-        self.id2word = {k: v for k, v in self.id2word.items() if self.counts[self.id2word[k]] >= min_count or k < 4 + SPECIAL_WORDS}
+        self.id2word = {k: v for k, v in self.id2word.items() if
+                        self.counts[self.id2word[k]] >= min_count or k < 4 + SPECIAL_WORDS}
         self.word2id = {v: k for k, v in self.id2word.items()}
         self.counts = {k: v for k, v in self.counts.items() if k in self.word2id}
         self.check_valid()

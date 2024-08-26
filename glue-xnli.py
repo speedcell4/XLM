@@ -5,19 +5,17 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-import os
 import argparse
+import os
 
-from xlm.utils import bool_flag, initialize_exp
 from xlm.evaluation.glue import GLUE
 from xlm.evaluation.xnli import XNLI
 from xlm.model.embedder import SentenceEmbedder
-
+from xlm.utils import bool_flag, initialize_exp
 
 GLUE_TASKS = ['MNLI-m', 'MNLI-mm', 'QQP', 'QNLI', 'SST-2', 'CoLA', 'MRPC', 'RTE', 'STS-B', 'WNLI', 'AX_MNLI-m']
 XNLI_TASKS = ['XNLI']
 TASKS = GLUE_TASKS + XNLI_TASKS
-
 
 # parse parameters
 parser = argparse.ArgumentParser(description='Train on GLUE or XNLI')

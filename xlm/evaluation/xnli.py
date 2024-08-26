@@ -5,25 +5,23 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-from logging import getLogger
-import os
 import copy
-import time
 import json
+import os
+import time
 from collections import OrderedDict
+from logging import getLogger
 
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
-from ..optim import get_optimizer
-from ..utils import concat_batches, truncate, to_cuda
 from ..data.dataset import ParallelDataset
 from ..data.loader import load_binarized, set_dico_parameters
-
+from ..optim import get_optimizer
+from ..utils import concat_batches, to_cuda, truncate
 
 XNLI_LANGS = ['ar', 'bg', 'de', 'el', 'en', 'es', 'fr', 'hi', 'ru', 'sw', 'th', 'tr', 'ur', 'vi', 'zh']
-
 
 logger = getLogger()
 
@@ -61,7 +59,8 @@ class XNLI:
         if not self.data['dico'] == self._embedder.dico:
             raise Exception(("Dictionary in evaluation data (%i words) seems different than the one " +
                              "in the pretrained model (%i words). Please verify you used the same dictionary, " +
-                             "and the same values for max_vocab and min_count.") % (len(self.data['dico']), len(self._embedder.dico)))
+                             "and the same values for max_vocab and min_count.") % (
+                            len(self.data['dico']), len(self._embedder.dico)))
 
         # embedder
         self.embedder = copy.deepcopy(self._embedder)
@@ -79,7 +78,6 @@ class XNLI:
 
         # train and evaluate the model
         for epoch in range(params.n_epochs):
-
             # update epoch
             self.epoch = epoch
 
@@ -151,7 +149,8 @@ class XNLI:
 
             # log
             if ns % (100 * bs) < bs:
-                logger.info("XNLI - Epoch %i - Train iter %7i - %.1f words/s - Loss: %.4f" % (self.epoch, ns, nw / (time.time() - t), sum(losses) / len(losses)))
+                logger.info("XNLI - Epoch %i - Train iter %7i - %.1f words/s - Loss: %.4f" % (
+                self.epoch, ns, nw / (time.time() - t), sum(losses) / len(losses)))
                 nw, t = 0, time.time()
                 losses = []
 
@@ -180,7 +179,6 @@ class XNLI:
                 total = 0
 
                 for batch in self.get_iterator(splt, lang):
-
                     # batch
                     (sent1, len1), (sent2, len2), idx = batch
                     x, lengths, positions, langs = concat_batches(

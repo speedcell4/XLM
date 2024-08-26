@@ -5,11 +5,11 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-from logging import getLogger
 import math
+from logging import getLogger
+
 import numpy as np
 import torch
-
 
 logger = getLogger()
 
@@ -277,13 +277,13 @@ class ParallelDataset(Dataset):
         Sanity checks.
         """
         eos = self.eos_index
-        assert len(self.pos1) == len(self.pos2) > 0                          # check number of sentences
+        assert len(self.pos1) == len(self.pos2) > 0  # check number of sentences
         assert len(self.pos1) == (self.sent1[self.pos1[:, 1]] == eos).sum()  # check sentences indices
         assert len(self.pos2) == (self.sent2[self.pos2[:, 1]] == eos).sum()  # check sentences indices
-        assert eos <= self.sent1.min() < self.sent1.max()                    # check dictionary indices
-        assert eos <= self.sent2.min() < self.sent2.max()                    # check dictionary indices
-        assert self.lengths1.min() > 0                                       # check empty sentences
-        assert self.lengths2.min() > 0                                       # check empty sentences
+        assert eos <= self.sent1.min() < self.sent1.max()  # check dictionary indices
+        assert eos <= self.sent2.min() < self.sent2.max()  # check dictionary indices
+        assert self.lengths1.min() > 0  # check empty sentences
+        assert self.lengths2.min() > 0  # check empty sentences
 
     def remove_empty_sentences(self):
         """

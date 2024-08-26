@@ -5,26 +5,24 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-from logging import getLogger
-import os
 import copy
-import time
 import json
+import os
+import time
 from collections import OrderedDict
+from logging import getLogger
 
 import numpy as np
 import torch
-from torch import nn
 import torch.nn.functional as F
-
-from scipy.stats import spearmanr, pearsonr
+from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import f1_score, matthews_corrcoef
+from torch import nn
 
-from ..optim import get_optimizer
-from ..utils import concat_batches, truncate, to_cuda
 from ..data.dataset import Dataset, ParallelDataset
 from ..data.loader import load_binarized, set_dico_parameters
-
+from ..optim import get_optimizer
+from ..utils import concat_batches, to_cuda, truncate
 
 N_CLASSES = {
     'MNLI-m': 3,
@@ -39,7 +37,6 @@ N_CLASSES = {
     'WNLI': 2,
     'AX_MNLI-m': 3,
 }
-
 
 logger = getLogger()
 
@@ -81,7 +78,8 @@ class GLUE:
         if not self.data['dico'] == self._embedder.dico:
             raise Exception(("Dictionary in evaluation data (%i words) seems different than the one " +
                              "in the pretrained model (%i words). Please verify you used the same dictionary, " +
-                             "and the same values for max_vocab and min_count.") % (len(self.data['dico']), len(self._embedder.dico)))
+                             "and the same values for max_vocab and min_count.") % (
+                            len(self.data['dico']), len(self._embedder.dico)))
 
         # embedder
         self.embedder = copy.deepcopy(self._embedder)
@@ -99,7 +97,6 @@ class GLUE:
 
         # train and evaluate the model
         for epoch in range(params.n_epochs):
-
             # update epoch
             self.epoch = epoch
 
@@ -145,7 +142,8 @@ class GLUE:
                 (sent1, len1), (sent2, len2), idx = batch
                 sent1, len1 = truncate(sent1, len1, params.max_len, params.eos_index)
                 sent2, len2 = truncate(sent2, len2, params.max_len, params.eos_index)
-                x, lengths, _, _ = concat_batches(sent1, len1, lang_id, sent2, len2, lang_id, params.pad_index, params.eos_index, reset_positions=False)
+                x, lengths, _, _ = concat_batches(sent1, len1, lang_id, sent2, len2, lang_id, params.pad_index,
+                                                  params.eos_index, reset_positions=False)
             y = self.data['train']['y'][idx]
             bs = len(lengths)
 
@@ -175,7 +173,8 @@ class GLUE:
             if ns != 0 and ns % (10 * bs) < bs:
                 logger.info(
                     "GLUE - %s - Epoch %s - Train iter %7i - %.1f words/s - %s Loss: %.4f"
-                    % (self.task, self.epoch, ns, nw / (time.time() - t), 'XE' if self.is_classif else 'MSE', sum(losses) / len(losses))
+                    % (self.task, self.epoch, ns, nw / (time.time() - t), 'XE' if self.is_classif else 'MSE',
+                       sum(losses) / len(losses))
                 )
                 nw, t = 0, time.time()
                 losses = []
@@ -215,7 +214,8 @@ class GLUE:
                 (sent1, len1), (sent2, len2), idx = batch
                 # sent1, len1 = truncate(sent1, len1, params.max_len, params.eos_index)
                 # sent2, len2 = truncate(sent2, len2, params.max_len, params.eos_index)
-                x, lengths, _, _ = concat_batches(sent1, len1, lang_id, sent2, len2, lang_id, params.pad_index, params.eos_index, reset_positions=False)
+                x, lengths, _, _ = concat_batches(sent1, len1, lang_id, sent2, len2, lang_id, params.pad_index,
+                                                  params.eos_index, reset_positions=False)
             y = self.data[splt]['y'][idx] if has_labels else None
 
             # cuda
@@ -243,7 +243,8 @@ class GLUE:
             prefix = f'{splt}_{task}'
             if self.is_classif:
                 scores['%s_acc' % prefix] = 100. * (pred == gold).sum() / len(pred)
-                scores['%s_f1' % prefix] = 100. * f1_score(gold, pred, average='binary' if params.out_features == 2 else 'micro')
+                scores['%s_f1' % prefix] = 100. * f1_score(gold, pred,
+                                                           average='binary' if params.out_features == 2 else 'micro')
                 scores['%s_mc' % prefix] = 100. * matthews_corrcoef(gold, pred)
             else:
                 scores['%s_prs' % prefix] = 100. * pearsonr(pred, gold)[0]

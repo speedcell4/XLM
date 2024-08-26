@@ -5,14 +5,14 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-from logging import getLogger
 import os
-import sys
-import torch
-import socket
 import signal
+import socket
 import subprocess
+import sys
+from logging import getLogger
 
+import torch
 
 logger = getLogger()
 
@@ -59,7 +59,7 @@ def init_distributed_mode(params):
     # SLURM job
     if params.is_slurm_job:
 
-        assert params.local_rank == -1   # on the cluster, this is handled by SLURM
+        assert params.local_rank == -1  # on the cluster, this is handled by SLURM
 
         SLURM_VARIABLES = [
             'SLURM_JOB_ID',
@@ -155,7 +155,6 @@ def init_distributed_mode(params):
 
     # initialize multi-GPU
     if params.multi_gpu:
-
         # http://pytorch.apachecn.org/en/0.3.0/distributed.html#environment-variable-initialization
         # 'env://' will read these environment variables:
         # MASTER_PORT - required; has to be a free port on machine with rank 0

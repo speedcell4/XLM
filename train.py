@@ -5,17 +5,17 @@
 # LICENSE file in the root directory of this source tree.
 #
 
+import argparse
 import json
 import random
-import argparse
 
-from xlm.slurm import init_signal_handler, init_distributed_mode
 from xlm.data.loader import check_data_params, load_data
-from xlm.utils import bool_flag, initialize_exp, set_sampling_probs, shuf_order
-from xlm.model import check_model_params, build_model
+from xlm.evaluation.evaluator import EncDecEvaluator, SingleEvaluator
+from xlm.model import build_model, check_model_params
 from xlm.model.memory import HashingMemory
-from xlm.trainer import SingleTrainer, EncDecTrainer
-from xlm.evaluation.evaluator import SingleEvaluator, EncDecEvaluator
+from xlm.slurm import init_distributed_mode, init_signal_handler
+from xlm.trainer import EncDecTrainer, SingleTrainer
+from xlm.utils import bool_flag, initialize_exp, set_sampling_probs, shuf_order
 
 
 def get_parser():
@@ -216,7 +216,6 @@ def get_parser():
 
 
 def main(params):
-
     # initialize the multi-GPU / multi-node training
     init_distributed_mode(params)
 

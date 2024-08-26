@@ -1,22 +1,20 @@
-from logging import getLogger
-import math
 import itertools
+import math
+from logging import getLogger
+
 import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
 
+from .query import QueryConv, QueryIdentity, QueryMLP
+from .utils import cartesian_product, get_gaussian_keys, get_knn_faiss, get_uniform_keys
 from ...utils import bool_flag
-from .utils import get_knn_faiss, cartesian_product
-from .utils import get_gaussian_keys, get_uniform_keys
-from .query import QueryIdentity, QueryMLP, QueryConv
-
 
 logger = getLogger()
 
 
 class HashingMemory(nn.Module):
-
     MEM_VALUES_PARAMS = '.values.weight'
     VALUES = None
     EVAL_MEMORY = True
@@ -154,13 +152,13 @@ class HashingMemory(nn.Module):
 
         # compute query / store it
         bs = np.prod(prefix_shape)
-        input = F.dropout(input, p=self.input_dropout, training=self.training)    # input shape
-        query = self.query_proj(input)                                            # (bs * heads, k_dim)
-        query = F.dropout(query, p=self.query_dropout, training=self.training)    # (bs * heads, k_dim)
+        input = F.dropout(input, p=self.input_dropout, training=self.training)  # input shape
+        query = self.query_proj(input)  # (bs * heads, k_dim)
+        query = F.dropout(query, p=self.query_dropout, training=self.training)  # (bs * heads, k_dim)
         assert query.shape == (bs * self.heads, self.k_dim)
 
         # get indices
-        scores, indices = self.get_indices(query, self.knn)                       # (bs * heads, knn) ** 2
+        scores, indices = self.get_indices(query, self.knn)  # (bs * heads, knn) ** 2
 
         # optionally shuffle indices for different heads
         if self.shuffle_indices:
@@ -174,23 +172,23 @@ class HashingMemory(nn.Module):
 
         # re-scoring
         if self.temperature != 1:
-            scores = scores / self.temperature                                    # (bs * heads, knn)
+            scores = scores / self.temperature  # (bs * heads, knn)
         if self.score_softmax:
-            scores = F.softmax(scores.float(), dim=-1).type_as(scores)            # (bs * heads, knn)
+            scores = F.softmax(scores.float(), dim=-1).type_as(scores)  # (bs * heads, knn)
         if self.score_subtract != '':
             if self.score_subtract == 'min':
-                to_sub = scores.min(1, keepdim=True)[0]                           # (bs * heads, 1)
+                to_sub = scores.min(1, keepdim=True)[0]  # (bs * heads, 1)
             if self.score_subtract == 'mean':
-                to_sub = scores.mean(1, keepdim=True)                             # (bs * heads, 1)
+                to_sub = scores.mean(1, keepdim=True)  # (bs * heads, 1)
             if self.score_subtract == 'median':
-                to_sub = scores.median(1, keepdim=True)[0]                        # (bs * heads, 1)
-            scores = scores - to_sub                                              # (bs * heads, knn)
+                to_sub = scores.median(1, keepdim=True)[0]  # (bs * heads, 1)
+            scores = scores - to_sub  # (bs * heads, knn)
         if self.score_normalize:
-            scores = scores / scores.norm(p=1, dim=1, keepdim=True)               # (bs * heads, knn)
+            scores = scores / scores.norm(p=1, dim=1, keepdim=True)  # (bs * heads, knn)
 
         # merge heads / knn (since we sum heads)
-        indices = indices.view(bs, self.heads * self.knn)                         # (bs, heads * knn)
-        scores = scores.view(bs, self.heads * self.knn)                           # (bs, heads * knn)
+        indices = indices.view(bs, self.heads * self.knn)  # (bs, heads * knn)
+        scores = scores.view(bs, self.heads * self.knn)  # (bs, heads * knn)
 
         # weighted sum of values
         # output = self.values(indices) * scores.unsqueeze(-1)                    # (bs * heads, knn, v_dim)
@@ -198,16 +196,16 @@ class HashingMemory(nn.Module):
         output = self.values(
             indices,
             per_sample_weights=scores.to(self.values.weight.data)
-        ).to(scores)                                                              # (bs, v_dim)
+        ).to(scores)  # (bs, v_dim)
         output = F.dropout(output, p=self.value_dropout, training=self.training)  # (bs, v_dim)
 
         # reshape output
         if self.input2d:
-            output = output.view(n_images, width, height, self.v_dim)             # (n_images, width, height, v_dim)
-            output = output.transpose(1, 3)                                       # (n_images, v_dim, height, width)
+            output = output.view(n_images, width, height, self.v_dim)  # (n_images, width, height, v_dim)
+            output = output.transpose(1, 3)  # (n_images, v_dim, height, width)
         else:
             if len(prefix_shape) >= 2:
-                output = output.view(prefix_shape + (self.v_dim,))                # (..., v_dim)
+                output = output.view(prefix_shape + (self.v_dim,))  # (..., v_dim)
 
         # store indices / scores (eval mode only - for usage statistics)
         if not self.training and HashingMemory.EVAL_MEMORY:
@@ -340,7 +338,8 @@ class HashingMemory(nn.Module):
         # optimization
         assert params.mem_grouped_conv is False or params.mem_multi_query_net
         params.mem_values_optimizer = params.optimizer if params.mem_values_optimizer == '' else params.mem_values_optimizer
-        params.mem_values_optimizer = params.mem_values_optimizer.replace('adam', 'sparseadam') if params.mem_sparse else params.mem_values_optimizer
+        params.mem_values_optimizer = params.mem_values_optimizer.replace('adam',
+                                                                          'sparseadam') if params.mem_sparse else params.mem_values_optimizer
 
         # even number of key dimensions for product quantization
         assert params.mem_k_dim >= 2
@@ -403,7 +402,8 @@ class HashingMemory(nn.Module):
 
         # query batchnorm
         if params.mem_query_batchnorm:
-            logger.warning("WARNING: if you use batch normalization, be sure that you use batches of sentences with the same size at training time. Otherwise, the padding token will result in incorrect mean/variance estimations in the BatchNorm layer.")
+            logger.warning(
+                "WARNING: if you use batch normalization, be sure that you use batches of sentences with the same size at training time. Otherwise, the padding token will result in incorrect mean/variance estimations in the BatchNorm layer.")
 
 
 class HashingMemoryFlat(HashingMemory):
@@ -485,10 +485,10 @@ class HashingMemoryFlat(HashingMemory):
 
         # optionally normalize queries
         if self.normalize_query:
-            query = query / query.norm(2, 1, keepdim=True).expand_as(query)   # (bs, kdim)
+            query = query / query.norm(2, 1, keepdim=True).expand_as(query)  # (bs, kdim)
 
         # compute scores with indices
-        scores = F.linear(query, keys, bias=None)                             # (bs, n_keys)
+        scores = F.linear(query, keys, bias=None)  # (bs, n_keys)
         scores, indices = scores.topk(knn, dim=1, largest=True, sorted=True)  # (bs, knn) ** 2
         # scores, indices = get_knn_faiss(keys.float(), query.float().contiguous(), knn, distance='dot_product')   # (bs, knn) ** 2
 
@@ -577,30 +577,29 @@ class HashingMemoryProduct(HashingMemory):
         n_keys = len(keys1)
 
         # split query for product quantization
-        q1 = query[:, :half]                                                                            # (bs, half)
-        q2 = query[:, half:]                                                                            # (bs, half)
+        q1 = query[:, :half]  # (bs, half)
+        q2 = query[:, half:]  # (bs, half)
 
         # optionally normalize queries
         if self.normalize_query:
-            q1 = q1 / q1.norm(2, 1, keepdim=True).expand_as(q1)                                         # (bs, half)
-            q2 = q2 / q2.norm(2, 1, keepdim=True).expand_as(q2)                                         # (bs, half)
+            q1 = q1 / q1.norm(2, 1, keepdim=True).expand_as(q1)  # (bs, half)
+            q2 = q2 / q2.norm(2, 1, keepdim=True).expand_as(q2)  # (bs, half)
 
         # compute memory value indices
         with torch.no_grad():
-
             # compute indices with associated scores
             scores1, indices1 = get_knn_faiss(keys1.float(), q1.float(), knn, distance='dot_product')  # (bs, knn) ** 2
             scores2, indices2 = get_knn_faiss(keys2.float(), q2.float(), knn, distance='dot_product')  # (bs, knn) ** 2
 
             # cartesian product on best candidate keys
-            concat_scores = cartesian_product(scores1, scores2)                                         # (bs, knn ** 2, 2)
-            concat_indices = cartesian_product(indices1, indices2)                                      # (bs, knn ** 2, 2)
+            concat_scores = cartesian_product(scores1, scores2)  # (bs, knn ** 2, 2)
+            concat_indices = cartesian_product(indices1, indices2)  # (bs, knn ** 2, 2)
 
-            all_scores = concat_scores.sum(2)                                                           # (bs, knn ** 2)
-            all_indices = concat_indices[:, :, 0] * n_keys + concat_indices[:, :, 1]                    # (bs, knn ** 2)
+            all_scores = concat_scores.sum(2)  # (bs, knn ** 2)
+            all_indices = concat_indices[:, :, 0] * n_keys + concat_indices[:, :, 1]  # (bs, knn ** 2)
 
-            _scores, best_indices = torch.topk(all_scores, k=knn, dim=1, largest=True, sorted=True)     # (bs, knn)
-            indices = all_indices.gather(1, best_indices)                                               # (bs, knn)
+            _scores, best_indices = torch.topk(all_scores, k=knn, dim=1, largest=True, sorted=True)  # (bs, knn)
+            indices = all_indices.gather(1, best_indices)  # (bs, knn)
 
         # compute value scores - for some reason, this part is extremely slow when the keys are learned
         indices1 = indices / n_keys
@@ -648,35 +647,35 @@ class HashingMemoryProductFast(HashingMemoryProduct):
         n_keys = len(keys1)
 
         # split query for product quantization
-        q1 = query[:, :half]                                                                                          # (bs, half)
-        q2 = query[:, half:]                                                                                          # (bs, half)
+        q1 = query[:, :half]  # (bs, half)
+        q2 = query[:, half:]  # (bs, half)
 
         # optionally normalize queries
         if self.normalize_query:
-            q1 = q1 / q1.norm(2, 1, keepdim=True).expand_as(q1)                                                       # (bs, half)
-            q2 = q2 / q2.norm(2, 1, keepdim=True).expand_as(q2)                                                       # (bs, half)
+            q1 = q1 / q1.norm(2, 1, keepdim=True).expand_as(q1)  # (bs, half)
+            q2 = q2 / q2.norm(2, 1, keepdim=True).expand_as(q2)  # (bs, half)
 
         # compute indices with associated scores
-        scores1 = F.linear(q1, keys1, bias=None)                                                                      # (bs, n_keys ** 0.5)
-        scores2 = F.linear(q2, keys2, bias=None)                                                                      # (bs, n_keys ** 0.5)
-        scores1, indices1 = scores1.topk(knn, dim=1, largest=True, sorted=True)                                       # (bs, knn) ** 2
-        scores2, indices2 = scores2.topk(knn, dim=1, largest=True, sorted=True)                                       # (bs, knn) ** 2
+        scores1 = F.linear(q1, keys1, bias=None)  # (bs, n_keys ** 0.5)
+        scores2 = F.linear(q2, keys2, bias=None)  # (bs, n_keys ** 0.5)
+        scores1, indices1 = scores1.topk(knn, dim=1, largest=True, sorted=True)  # (bs, knn) ** 2
+        scores2, indices2 = scores2.topk(knn, dim=1, largest=True, sorted=True)  # (bs, knn) ** 2
         # scores1, indices1 = get_knn_faiss(keys1, q1.contiguous(), knn, distance='dot_product')                        # (bs, knn) ** 2
         # scores2, indices2 = get_knn_faiss(keys2, q2.contiguous(), knn, distance='dot_product')                        # (bs, knn) ** 2
 
         # cartesian product on best candidate keys
         all_scores = (
-            scores1.view(bs, knn, 1).expand(bs, knn, knn) +
-            scores2.view(bs, 1, knn).expand(bs, knn, knn)
-        ).view(bs, -1)                                                                                                # (bs, knn ** 2)
+                scores1.view(bs, knn, 1).expand(bs, knn, knn) +
+                scores2.view(bs, 1, knn).expand(bs, knn, knn)
+        ).view(bs, -1)  # (bs, knn ** 2)
         all_indices = (
-            indices1.view(bs, knn, 1).expand(bs, knn, knn) * n_keys +
-            indices2.view(bs, 1, knn).expand(bs, knn, knn)
-        ).view(bs, -1)                                                                                                # (bs, knn ** 2)
+                indices1.view(bs, knn, 1).expand(bs, knn, knn) * n_keys +
+                indices2.view(bs, 1, knn).expand(bs, knn, knn)
+        ).view(bs, -1)  # (bs, knn ** 2)
 
         # select overall best scores and indices
-        scores, best_indices = torch.topk(all_scores, k=knn, dim=1, largest=True, sorted=True)                        # (bs, knn)
-        indices = all_indices.gather(1, best_indices)                                                                 # (bs, knn)
+        scores, best_indices = torch.topk(all_scores, k=knn, dim=1, largest=True, sorted=True)  # (bs, knn)
+        indices = all_indices.gather(1, best_indices)  # (bs, knn)
 
         # code below: debug instant retrieval speed
         # scores = torch.zeros(bs, knn, dtype=query.dtype, device=query.device)

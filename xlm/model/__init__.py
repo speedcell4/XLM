@@ -5,14 +5,14 @@
 # LICENSE file in the root directory of this source tree.
 #
 
-from logging import getLogger
 import os
+from logging import getLogger
+
 import torch
 
+from .memory import HashingMemory
 from .pretrain import load_embeddings
 from .transformer import DECODER_ONLY_PARAMS, TransformerModel  # , TRANSFORMER_LAYER_PARAMS
-from .memory import HashingMemory
-
 
 logger = getLogger()
 
@@ -69,8 +69,10 @@ def check_model_params(params):
         params.mem_enc_positions = [(int(x[:-1]), 'after') if x[-1] == '+' else (int(x), 'in') for x in s_enc]
         params.mem_dec_positions = [(int(x[:-1]), 'after') if x[-1] == '+' else (int(x), 'in') for x in s_dec]
         assert len(params.mem_enc_positions) + len(params.mem_dec_positions) > 0
-        assert len(params.mem_enc_positions) == 0 or 0 <= min([x[0] for x in params.mem_enc_positions]) <= max([x[0] for x in params.mem_enc_positions]) <= params.n_layers - 1
-        assert len(params.mem_dec_positions) == 0 or 0 <= min([x[0] for x in params.mem_dec_positions]) <= max([x[0] for x in params.mem_dec_positions]) <= params.n_layers - 1
+        assert len(params.mem_enc_positions) == 0 or 0 <= min([x[0] for x in params.mem_enc_positions]) <= max(
+            [x[0] for x in params.mem_enc_positions]) <= params.n_layers - 1
+        assert len(params.mem_dec_positions) == 0 or 0 <= min([x[0] for x in params.mem_dec_positions]) <= max(
+            [x[0] for x in params.mem_dec_positions]) <= params.n_layers - 1
 
     # reload pretrained word embeddings
     if params.reload_emb != '':
@@ -99,8 +101,7 @@ def set_pretrain_emb(model, dico, word2id, embeddings):
             n_found += 1
             model.embeddings.weight[i] = embeddings[idx].cuda()
             model.pred_layer.proj.weight[i] = embeddings[idx].cuda()
-    logger.info("Pretrained %i/%i words (%.3f%%)."
-                % (n_found, len(dico), 100. * n_found / len(dico)))
+    logger.info(f"Pretrained {n_found:d}/{len(dico):d} words ({100. * n_found / len(dico):.3f}%).")
 
 
 def build_model(params, dico):
@@ -118,8 +119,10 @@ def build_model(params, dico):
 
         # reload a pretrained model
         if params.reload_model != '':
-            logger.info("Reloading model from %s ..." % params.reload_model)
-            reloaded = torch.load(params.reload_model, map_location=lambda storage, loc: storage.cuda(params.local_rank))['model']
+            logger.info(f"Reloading model from {params.reload_model} ...")
+            reloaded = \
+                torch.load(params.reload_model, map_location=lambda storage, loc: storage.cuda(params.local_rank))[
+                    'model']
             if all([k.startswith('module.') for k in reloaded.keys()]):
                 reloaded = {k[len('module.'):]: v for k, v in reloaded.items()}
 
@@ -133,14 +136,16 @@ def build_model(params, dico):
 
             model.load_state_dict(reloaded)
 
-        logger.info("Model: {}".format(model))
-        logger.info("Number of parameters (model): %i" % sum([p.numel() for p in model.parameters() if p.requires_grad]))
+        logger.info(f"Model: {model}")
+        logger.info(
+            f"Number of parameters (model): {sum([p.numel() for p in model.parameters() if p.requires_grad]):d}")
 
         return model.cuda()
 
     else:
         # build
-        encoder = TransformerModel(params, dico, is_encoder=True, with_output=True)  # TODO: only output when necessary - len(params.clm_steps + params.mlm_steps) > 0
+        encoder = TransformerModel(params, dico, is_encoder=True,
+                                   with_output=True)  # TODO: only output when necessary - len(params.clm_steps + params.mlm_steps) > 0
         decoder = TransformerModel(params, dico, is_encoder=False, with_output=True)
 
         # reload pretrained word embeddings
@@ -156,7 +161,7 @@ def build_model(params, dico):
 
             # reload encoder
             if enc_path != '':
-                logger.info("Reloading encoder from %s ..." % enc_path)
+                logger.info(f"Reloading encoder from {enc_path} ...")
                 enc_reload = torch.load(enc_path, map_location=lambda storage, loc: storage.cuda(params.local_rank))
                 enc_reload = enc_reload['model' if 'model' in enc_reload else 'encoder']
                 if all([k.startswith('module.') for k in enc_reload.keys()]):
@@ -165,7 +170,7 @@ def build_model(params, dico):
 
             # reload decoder
             if dec_path != '':
-                logger.info("Reloading decoder from %s ..." % dec_path)
+                logger.info(f"Reloading decoder from {dec_path} ...")
                 dec_reload = torch.load(dec_path, map_location=lambda storage, loc: storage.cuda(params.local_rank))
                 dec_reload = dec_reload['model' if 'model' in dec_reload else 'decoder']
                 if all([k.startswith('module.') for k in dec_reload.keys()]):
@@ -173,13 +178,15 @@ def build_model(params, dico):
                 for i in range(params.n_layers):
                     for name in DECODER_ONLY_PARAMS:
                         if name % i not in dec_reload:
-                            logger.warning("Parameter %s not found." % (name % i))
+                            logger.warning(f"Parameter {name % i} not found.")
                             dec_reload[name % i] = decoder.state_dict()[name % i]
                 decoder.load_state_dict(dec_reload)
 
-        logger.debug("Encoder: {}".format(encoder))
-        logger.debug("Decoder: {}".format(decoder))
-        logger.info("Number of parameters (encoder): %i" % sum([p.numel() for p in encoder.parameters() if p.requires_grad]))
-        logger.info("Number of parameters (decoder): %i" % sum([p.numel() for p in decoder.parameters() if p.requires_grad]))
+        logger.debug(f"Encoder: {encoder}")
+        logger.debug(f"Decoder: {decoder}")
+        logger.info(
+            f"Number of parameters (encoder): {sum([p.numel() for p in encoder.parameters() if p.requires_grad]):d}")
+        logger.info(
+            f"Number of parameters (decoder): {sum([p.numel() for p in decoder.parameters() if p.requires_grad]):d}")
 
         return encoder.cuda(), decoder.cuda()

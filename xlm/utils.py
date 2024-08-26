@@ -5,19 +5,19 @@
 # LICENSE file in the root directory of this source tree.
 #
 
+import argparse
+import getpass
 import os
-import re
-import sys
 import pickle
 import random
-import getpass
-import argparse
+import re
 import subprocess
+import sys
+
 import numpy as np
 import torch
 
 from .logger import create_logger
-
 
 FALSY_STRINGS = {'off', 'false', '0'}
 TRUTHY_STRINGS = {'on', 'true', '1'}
@@ -275,8 +275,10 @@ def shuf_order(langs, params=None, n=5):
         p_mono = p_mono / p_mono.sum()
         p_para = p_para / p_para.sum()
 
-    s_mono = [mono[i] for i in np.random.choice(len(mono), size=min(n, len(mono)), p=p_mono, replace=True)] if len(mono) > 0 else []
-    s_para = [para[i] for i in np.random.choice(len(para), size=min(n, len(para)), p=p_para, replace=True)] if len(para) > 0 else []
+    s_mono = [mono[i] for i in np.random.choice(len(mono), size=min(n, len(mono)), p=p_mono, replace=True)] if len(
+        mono) > 0 else []
+    s_para = [para[i] for i in np.random.choice(len(para), size=min(n, len(para)), p=p_para, replace=True)] if len(
+        para) > 0 else []
 
     assert len(s_mono) + len(s_para) > 0
     return [(lang, None) for lang in s_mono] + s_para

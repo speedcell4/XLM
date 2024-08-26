@@ -59,7 +59,6 @@ def convs(channel_sizes, kernel_sizes, bias=True, batchnorm=True, residual=False
 class GroupedLinear(nn.Module):
 
     def __init__(self, in_features, out_features, bias=True, groups=1):
-
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -87,8 +86,10 @@ class BottleneckResidualConv2d(nn.Module):
         hidden_channels = min(input_channels, output_channels)
         assert all(k % 2 == 1 for k in kernel_size)
 
-        self.conv1 = nn.Conv2d(input_channels, hidden_channels, kernel_size, padding=[k // 2 for k in kernel_size], bias=bias, groups=groups)
-        self.conv2 = nn.Conv2d(hidden_channels, output_channels, kernel_size, padding=[k // 2 for k in kernel_size], bias=bias, groups=groups)
+        self.conv1 = nn.Conv2d(input_channels, hidden_channels, kernel_size, padding=[k // 2 for k in kernel_size],
+                               bias=bias, groups=groups)
+        self.conv2 = nn.Conv2d(hidden_channels, output_channels, kernel_size, padding=[k // 2 for k in kernel_size],
+                               bias=bias, groups=groups)
         self.act = nn.ReLU()
 
         self.batchnorm = batchnorm
@@ -153,8 +154,8 @@ class QueryIdentity(nn.Module):
 class QueryMLP(nn.Module):
 
     def __init__(
-        self, input_dim, heads, k_dim, product_quantization, multi_query_net,
-        sizes, bias=True, batchnorm=True, grouped_conv=False
+            self, input_dim, heads, k_dim, product_quantization, multi_query_net,
+            sizes, bias=True, batchnorm=True, grouped_conv=False
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -204,9 +205,9 @@ class QueryMLP(nn.Module):
 class QueryConv(nn.Module):
 
     def __init__(
-        self, input_dim, heads, k_dim, product_quantization, multi_query_net,
-        sizes, kernel_sizes, bias=True, batchnorm=True,
-        residual=False, grouped_conv=False
+            self, input_dim, heads, k_dim, product_quantization, multi_query_net,
+            sizes, kernel_sizes, bias=True, batchnorm=True,
+            residual=False, grouped_conv=False
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -225,7 +226,8 @@ class QueryConv(nn.Module):
 
         # CNNs
         if self.grouped_conv:
-            self.query_convs = convs(sizes, kernel_sizes, bias=bias, batchnorm=batchnorm, residual=residual, groups=self.groups)
+            self.query_convs = convs(sizes, kernel_sizes, bias=bias, batchnorm=batchnorm, residual=residual,
+                                     groups=self.groups)
         elif len(self.sizes) == 2:
             sizes_ = list(sizes)
             sizes_[-1] = sizes_[-1] * self.groups

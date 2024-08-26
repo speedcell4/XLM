@@ -6,12 +6,12 @@
 #
 
 from logging import getLogger
+
 import torch
 
 from .transformer import TransformerModel
-from ..data.dictionary import Dictionary, BOS_WORD, EOS_WORD, PAD_WORD, UNK_WORD, MASK_WORD
+from ..data.dictionary import BOS_WORD, Dictionary, EOS_WORD, MASK_WORD, PAD_WORD, UNK_WORD
 from ..utils import AttrDict
-
 
 logger = getLogger()
 

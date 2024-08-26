@@ -61,6 +61,7 @@ def create_logger(filepath, rank):
     # reset logger elapsed time
     def reset_time():
         log_formatter.start_time = time.time()
+
     logger.reset_time = reset_time
 
     return logger
